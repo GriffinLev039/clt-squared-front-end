@@ -1,4 +1,12 @@
-import Mapbox, { Camera, CircleLayer, FillLayer, LineLayer, MapView, ShapeSource, StyleURL } from "@rnmapbox/maps";
+import Mapbox, {
+    Camera,
+    CircleLayer,
+    FillLayer,
+    LineLayer,
+    MapView,
+    ShapeSource,
+    StyleURL
+} from "@rnmapbox/maps";
 import { useLocalSearchParams } from "expo-router";
 import { Feature, FeatureCollection } from "geojson";
 import { useState } from "react";
@@ -6,7 +14,6 @@ import { StyleSheet, Text, View } from "react-native";
 import geoJSONData from '../src/assets/mockData.json';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "This wont happen");
-
 
 const DetailsScreen = () => {
     const { id } = useLocalSearchParams();
@@ -18,7 +25,7 @@ const DetailsScreen = () => {
 
     const getCoordinates = (f: Feature) => {
         if (!f) {
-            return [-80.8431, 35.2271]; //CENTER OF CLT
+            return [-80.8431, 35.2271]; // CENTER OF CLT
         }
         const geoType = f.geometry.type;
         if (geoType == "Point") {
@@ -30,11 +37,9 @@ const DetailsScreen = () => {
         } else {
             return [-80.8431, 35.2271];
         }
-
-    }
+    };
 
     const [center] = useState(getCoordinates(selectedFeature));
-
 
     if (!selectedFeature) {
         return (
@@ -46,9 +51,11 @@ const DetailsScreen = () => {
 
     return (
         <View style={styles.container}>
-            <MapView styleURL={StyleURL.Street}
+            <MapView
+                styleURL={StyleURL.Street}
                 style={styles.mapContainer}
-                logoEnabled={false}>
+                logoEnabled={false}
+            >
                 <Camera
                     zoomLevel={16}
                     centerCoordinate={center}
@@ -58,7 +65,7 @@ const DetailsScreen = () => {
                     <FillLayer
                         id="combinedPolygons"
                         filter={['==', ['geometry-type'], 'Polygon']}
-                        style={{ fillColor: 'green' }} 
+                        style={{ fillColor: 'green' }}
                     />
                     <LineLayer
                         id="combinedLines"
@@ -72,30 +79,88 @@ const DetailsScreen = () => {
                     />
                 </ShapeSource>
             </MapView>
-            <View style={styles.textContainer}>
-                <Text style={styles.title}>Project Details</Text>
-                <Text>Name: {selectedFeature.properties?.Project_Name}</Text>
-                <Text>ID: {selectedFeature.properties?.OBJECTID}</Text>
-                <Text>Location Description: {selectedFeature.properties?.Location_Description}</Text>
-                <Text>Project Description: {selectedFeature.properties?.Public_Project_Description}</Text>
-                <Text>Status: {selectedFeature.properties?.Status || "N/A"}</Text>
+
+            {/* Forced separation section */}
+            <View style={styles.detailsSection}>
+                <Text style={styles.sectionHeader}>Project Details</Text>
+                <View style={styles.divider} />
+
+                <View style={styles.textContainer}>
+                    <Text style={styles.detailText}>
+                        <Text style={styles.label}>Name: </Text>
+                        {selectedFeature.properties?.Project_Name}
+                    </Text>
+
+                    <Text style={styles.detailText}>
+                        <Text style={styles.label}>ID: </Text>
+                        {selectedFeature.properties?.OBJECTID}
+                    </Text>
+
+                    <Text style={styles.detailText}>
+                        <Text style={styles.label}>Location Description: </Text>
+                        {selectedFeature.properties?.Location_Description}
+                    </Text>
+
+                    <Text style={styles.detailText}>
+                        <Text style={styles.label}>Project Description: </Text>
+                        {selectedFeature.properties?.Public_Project_Description}
+                    </Text>
+
+                    <Text style={styles.detailText}>
+                        <Text style={styles.label}>Status: </Text>
+                        {selectedFeature.properties?.Status || "N/A"}
+                    </Text>
+                </View>
             </View>
         </View>
     );
-}
+};
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, backgroundColor: 'white' },
-    title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
+    container: {
+        flex: 1,
+        padding: 20,
+        backgroundColor: 'white'
+    },
+
     mapContainer: {
-        flex: 1
+        width: '100%',
+        height: 180,
+        marginVertical: 15,
+        borderRadius: 20,
+        overflow: 'hidden',
     },
+
+    detailsSection: {
+        marginTop: 10
+    },
+
+    sectionHeader: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 6
+    },
+
+    divider: {
+        height: 1,
+        backgroundColor: '#e0e0e0',
+        marginBottom: 10
+    },
+
     textContainer: {
-        flex: 1
+        // no flex here
     },
-    mapItself: {
-        flex: 1
+
+    label: {
+        fontWeight: 'bold'
+    },
+
+    detailText: {
+        fontSize: 16,
+        marginBottom: 8,
+        lineHeight: 22
     }
 });
 
 export default DetailsScreen;
+

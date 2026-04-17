@@ -7,16 +7,34 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import geoJSON from '../../src/assets/mockData.json';
 
+
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "This wont happen");
 
 const CharlotteMapTest = () => {
   const CLT_CENTER = [-80.8431, 35.2271];
   const router = useRouter();
-  const [followUser, setFollowUser] = useState(true);
+  const [followUser, setFollowUser] = useState(false);
   const [showPolygons, setShowPolygons] = useState(true);
   const [showLines, setShowLines] = useState(true);
   const [showPoints, setShowPoints] = useState(true);
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
+
+  const mapRef = useRef<MapView>(null);
+  const [visibleBounds, setVisibleBounds] = useState<number[][] | null>(null);
+
+
+  const isInBounds = (coordinates: number[], bounds: number[][]) => {
+  const [minLng, minLat, maxLng, maxLat] = [
+    bounds[1][0], bounds[1][1], bounds[0][0], bounds[0][1]
+  ];
+  return (
+    coordinates[0] >= minLng &&
+    coordinates[0] <= maxLng &&
+    coordinates[1] >= minLat &&
+    coordinates[1] <= maxLat
+  );
+};
+
 
   useEffect(() => {
     (async () => {
@@ -45,12 +63,31 @@ const CharlotteMapTest = () => {
 
 
 
-const activeGeoJSON = useMemo(() => {
+const activeGeoJSON = useMemo(() => { //begins here
+  let features = geoJ.features.filter(f=> f.properties?.status !== 'archive');
+  if (!visibleBounds){
+    features = features.slice(0, 50);
+  } else {
+    features = features.filter(f=>{
+      if (!f.geometry) return false;
+      if (f.geometry.type === 'Point') {
+        return isInBounds(f.geometry.coordinates, visibleBounds);
+      }
+      if (f.geometry.type === 'LineString') {
+        return f.geometry.coordinates.some(coord => isInBounds(coord, visibleBounds));
+      }
+      if (f.geometry.type === 'Polygon') {
+        return f.geometry.coordinates[0].some(coord => isInBounds(coord, visibleBounds));
+      }
+      return false;
+    });
+  } //ends here
   return {
     ...geoJ,
-    features: geoJ.features.filter(f => f.properties?.status !== 'archive')
+    features
+    //features: geoJ.features.filter(f => f.properties?.status !== 'archive')
   };
-}, [geoJ]);
+}, [geoJ, visibleBounds]);
 
 
   const cameraRef = useRef<Camera>(null);
@@ -64,9 +101,15 @@ const activeGeoJSON = useMemo(() => {
 
   return (
     <View style={styles.page}>
-      <MapView style={styles.map}
+      <MapView ref = {mapRef}
+        style={styles.map}
         styleURL={StyleURL.Street}
-        logoEnabled={false}>
+        logoEnabled={false}
+        onMapIdle={async() => {
+          const bounds = await mapRef.current?.getVisibleBounds();
+          if (bounds) setVisibleBounds(bounds);
+        }}
+        >
         <Camera
           zoomLevel={13}
           defaultSettings={{ centerCoordinate: CLT_CENTER }}
@@ -85,18 +128,24 @@ const activeGeoJSON = useMemo(() => {
         {/* Styleimport could be useful here? Unsure if worth the effort or if it does much of anything */}
         {/* https://docs.mapbox.com/help/tutorials/getting-started-react-native/?step=5 */}
 
-        <ShapeSource id="combinedSource" shape={activeGeoJSON} onPress={handlePress}>
+        <ShapeSource id="combinedSource"
+        shape={activeGeoJSON}
+        onPress={handlePress}
+        //cluster = {true}
+        //clusterRadius = {50}
+        //clusterMaxZoomLevel = {14}
+        >
           <FillLayer
             id="combinedPolygons"
             filter={['==', ['geometry-type'], 'Polygon']}
-            style={{ fillColor: 'green', fillOpacity: 0.4, lineBorderColor: 'black', lineBorderWidth: 2, visibility: showPolygons ? 'visible' : 'none' }} // Adding a style helps TS validate the element
+            style={{ fillColor: 'green', fillOpacity: 0.15, lineBorderColor: 'black', lineBorderWidth: 2, visibility: showPolygons ? 'visible' : 'none' }}
           />
           <LineLayer
             id="polygonOutline"
             filter={['==', ['geometry-type'], 'Polygon']}
             style={{
-              lineColor: 'green',
-              lineWidth: 3,      
+              lineColor: '#1b5e20',
+              lineWidth: 2,      
               lineJoin: 'round',  
               visibility: showPolygons ? 'visible' : 'none'
             }}
@@ -109,31 +158,34 @@ const activeGeoJSON = useMemo(() => {
           <CircleLayer
             id="combinedPoints"
             filter={['==', ['geometry-type'], 'Point']}
-            style={{ circleColor: 'red', visibility: showPoints ? 'visible' : 'none' }}
+            style={{ circleColor: 'red', circleRadius: 5,visibility: showPoints ? 'visible' : 'none', circleOpacity: ['step', ['zoom'], 0, 11, 1]}}
           />
         </ShapeSource>
         <UserLocation visible={true} />
       </MapView>
+
       <View style={styles.layerControlContainer}>
+
+        {/** BUTTONS */}
         <TouchableOpacity
           style={[styles.floatingButton, !showPoints && styles.buttonDisabled]}
           onPress={() => setShowPoints(!showPoints)}
         >
-          <Text style={styles.buttonText}>Points</Text>
+          <Text style={styles.buttonText}>Small Projects</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.floatingButton, !showLines && styles.buttonDisabled]}
           onPress={() => setShowLines(!showLines)}
         >
-          <Text style={styles.buttonText}>Lines</Text>
+          <Text style={styles.buttonText}>Road & Lightrail</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.floatingButton, !showPolygons && styles.buttonDisabled]}
           onPress={() => setShowPolygons(!showPolygons)}
         >
-          <Text style={styles.buttonText}>Polygons</Text>
+          <Text style={styles.buttonText}>Construction & Renovation</Text>
         </TouchableOpacity>
       </View>
       {!followUser && (
@@ -156,7 +208,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   map: {
-    flex: 1,
+    height: '100%',
+    width: '90%',
+    alignSelf: 'center',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginTop: 20,
   },
   // Container for the layer toggle stack
   layerControlContainer: {
@@ -167,18 +224,25 @@ const styles = StyleSheet.create({
   },
   // Individual button style
   floatingButton: {
-    backgroundColor: '#007AFF', // Standard iOS Blue
+    backgroundColor: '#2e7d32', // maybe change the color to '#2e7d32' so when its activated it matches the green in the navigation bar
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 8,
-    elevation: 4, // Android shadow
+    elevation: 8, // Android shadow
     shadowColor: '#000', // iOS shadow
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    //added to make it pop
+    borderWidth: 1,
+    borderColor: '#1b5e20',
+    borderBottomWidth: 3,
+    borderBottomColor: '#1b5e20',
   },
   buttonDisabled: {
-    backgroundColor: '#999', // Gray out when hidden
+    backgroundColor: '#969c9f', // Gray out when hidden; this makes since but we could also do a version of this color '#d4f5d0', to tie in with the navigation bar
+    borderColor: '#999',
+    borderBottomColor: '#999',
   },
   buttonText: {
     color: 'white',

@@ -82,7 +82,7 @@ const ListScreen = () => {
                 data={sortedData}
                 renderItem={renderListItem}
                 keyExtractor={(item) => item.properties?.OBJECTID?.toString() || Math.random().toString()}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                //ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
         </View>
     );
@@ -90,10 +90,20 @@ const ListScreen = () => {
 
 const styles = StyleSheet.create({
     page: { flex: 1 },
-    listContainer: { flex: 1 },
+    listContainer: { flex: 1,
+        paddingTop: 20
+    },
     listItem: {
         padding: 15,
         backgroundColor: 'white',
+        marginHorizontal: 10,
+        marginVertical: 6,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 4
     },
     itemTitle: {
         fontSize: 18,
